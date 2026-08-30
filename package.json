@@ -1,0 +1,48 @@
+{
+  "name": "pi-skill-retriever",
+  "version": "0.1.0",
+  "description": "Keyword-based skill retrieval for the Pi coding agent — scores your prompt against all discovered skills each turn and injects the top matches as context. Zero LLM calls, zero config.",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "bun test",
+    "prepublishOnly": "npm run build && npm test"
+  },
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "pi-coding-agent",
+    "pi",
+    "skills",
+    "retrieval",
+    "agent-skills"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nadimtuhin/pi-skill-retriever.git"
+  },
+  "bugs": {
+    "url": "https://github.com/nadimtuhin/pi-skill-retriever/issues"
+  },
+  "homepage": "https://github.com/nadimtuhin/pi-skill-retriever#readme",
+  "author": "Nadim Tuhin <nadimtuhin+pad@gmail.com>",
+  "license": "MIT",
+  "devDependencies": {
+    "@earendil-works/pi-coding-agent": "^0.84.4",
+    "bun-types": "^1.4.0",
+    "typescript": "^5.6.0"
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": ">=0.80.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
