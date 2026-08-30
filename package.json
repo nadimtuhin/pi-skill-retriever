@@ -1,6 +1,6 @@
 {
   "name": "pi-skill-retriever",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Keyword-based skill retrieval for the Pi coding agent — scores your prompt against all discovered skills each turn and injects the top matches as context. Zero LLM calls, zero config.",
   "type": "module",
   "main": "dist/index.js",
