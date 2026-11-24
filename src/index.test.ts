@@ -82,3 +82,55 @@ test("llmGate skips call when candidates <= MAX_INJECT", async () => {
 	expect(names).toBeNull();
 	expect(called).toBe(false);
 });
+
+// ── regression tests ─────────────────────────────────────────────────────
+
+const mk = (name: string, description: string) => ({
+	name,
+	description,
+	filePath: `/skills/${name}/SKILL.md`,
+	disableModelInvocation: false,
+});
+
+test("tokenize keeps non-ASCII words intact", () => {
+	expect(tokenize("Résumé formatter für Café")).toEqual(["résumé", "formatter", "für", "café"]);
+	expect(tokenize("настроить базу данных")).toEqual(["настроить", "базу", "данных"]);
+});
+
+test("non-ASCII prompt does not match unrelated skills via ASCII fragments", () => {
+	const pool = [mk("summary-writer", "summarize documents"), mk("résumé-builder", "build a résumé")];
+	const names = scoreSkills("résumé", pool).map((s) => s.skill.name);
+	expect(names).toEqual(["résumé-builder"]);
+});
+
+test("short tokens do not match in the middle of words", () => {
+	const pool = [mk("mongodb", "MongoDB queries"), mk("golang", "Go language idioms")];
+	const names = scoreSkills("go", pool).map((s) => s.skill.name);
+	expect(names).toEqual(["golang"]);
+});
+
+test("repeated prompt words do not inflate a skill's score", () => {
+	const pool = [mk("test-utils", "helpers"), mk("job-runner", "test runner for jobs")];
+	const scored = scoreSkills("test test test runner", pool);
+	expect(scored[0].skill.name).toBe("job-runner");
+});
+
+test("skills with a missing description do not crash formatting", async () => {
+	const bare = { name: "bare", filePath: "/skills/bare/SKILL.md", disableModelInvocation: false } as any;
+	expect(() => hintBlock([bare])).not.toThrow();
+	const cands = [...manyCandidates, { skill: bare, score: 3 }];
+	const names = await llmGate(async () => '["bare"]', "task", cands);
+	expect(names).toEqual(["bare"]);
+});
+
+test("llmGate drops duplicate names", async () => {
+	const complete = async () => '["n8n-expression-syntax", {"name": "n8n-expression-syntax"}, "n8n-code-javascript"]';
+	const names = await llmGate(complete, "task", manyCandidates);
+	expect(names).toEqual(["n8n-expression-syntax", "n8n-code-javascript"]);
+});
+
+test("hyphenated and decomposed-unicode prompt tokens still match", () => {
+	const pool = [mk("n8n-expression-syntax", "expressions"), mk("café-guide", "coffee")];
+	expect(scoreSkills("fix n8n-expression bug", pool)[0].skill.name).toBe("n8n-expression-syntax");
+	expect(scoreSkills("café tips", pool)[0]?.skill.name).toBe("café-guide");
+});

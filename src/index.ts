@@ -53,25 +53,32 @@ const STOP = new Set([
 
 /** Tokenize text into lowercase terms, dropping stopwords and single chars. */
 export function tokenize(text: string): string[] {
-	return (text.toLowerCase().match(/[a-z0-9_-]+/g) ?? []).filter(
-		(t) => t.length > 1 && !STOP.has(t),
+	return (text.normalize("NFC").toLowerCase().match(/[\p{L}\p{M}\p{N}_-]+/gu) ?? []).filter(
+		(t) => [...t].length > 1 && !STOP.has(t),
 	);
+}
+
+/** True when `token` occurs in `text` at the start of a word (not mid-word). */
+function matchesWord(text: string, token: string): boolean {
+	// Tokens only contain letters, marks, digits, "_" and "-", so no escaping is needed
+	// (and "\-" would be an invalid escape under the "u" flag).
+	return new RegExp(`(?:^|[^\\p{L}\\p{M}\\p{N}])${token}`, "u").test(text);
 }
 
 /** Score skills against a prompt: name match = 2, description match = 1. */
 export function scoreSkills(prompt: string, skills: PiSkill[]): ScoredSkill[] {
-	const tokens = tokenize(prompt);
+	const tokens = [...new Set(tokenize(prompt))];
 	if (tokens.length === 0) return [];
 
 	const scored: ScoredSkill[] = [];
 	for (const skill of skills) {
 		if (skill.disableModelInvocation) continue;
-		const name = skill.name.toLowerCase();
-		const desc = (skill.description ?? "").toLowerCase();
+		const name = skill.name.normalize("NFC").toLowerCase();
+		const desc = (skill.description ?? "").normalize("NFC").toLowerCase();
 		let score = 0;
 		for (const t of tokens) {
-			if (name.includes(t)) score += 2;
-			else if (desc.includes(t)) score += 1;
+			if (matchesWord(name, t)) score += 2;
+			else if (matchesWord(desc, t)) score += 1;
 		}
 		if (score > 0) scored.push({ skill, score });
 	}
@@ -88,7 +95,7 @@ export function hintBlock(matches: PiSkill[]): string {
 	];
 	for (const skill of matches) {
 		lines.push(`  - ${skill.name}: ${skill.filePath}`);
-		lines.push(`    ${skill.description.slice(0, 160)}`);
+		lines.push(`    ${(skill.description ?? "").slice(0, 160)}`);
 	}
 	lines.push("", "Load only those genuinely relevant. Skip if none apply.");
 	return lines.join("\n");
@@ -118,7 +125,7 @@ export async function llmGate(
 	if (candidates.length <= MAX_INJECT) return null; // nothing to narrow
 	const list = candidates
 		.slice(0, MAX_CANDIDATES)
-		.map((c) => `- ${c.skill.name}: ${c.skill.description.slice(0, 150)}`)
+		.map((c) => `- ${c.skill.name}: ${(c.skill.description ?? "").slice(0, 150)}`)
 		.join("\n");
 	let text: string;
 	try {
@@ -135,10 +142,14 @@ export async function llmGate(
 		if (!Array.isArray(parsed)) return null;
 		// keep only known names, preserve skill objects
 		const known = new Set(candidates.map((c) => c.skill.name));
-		const names = parsed
-			.filter((n) => typeof n === "string" || (n && typeof n.name === "string"))
-			.map((n) => (typeof n === "string" ? n : n.name))
-			.filter((n: string) => known.has(n));
+		const names: string[] = [
+			...new Set<string>(
+				parsed
+					.filter((n) => typeof n === "string" || (n && typeof n.name === "string"))
+					.map((n) => (typeof n === "string" ? n : n.name))
+					.filter((n: string) => known.has(n)),
+			),
+		];
 		return names.length > 0 ? names.slice(0, MAX_INJECT) : null;
 	} catch {
 		return null;
